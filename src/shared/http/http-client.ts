@@ -115,6 +115,15 @@ export class HttpClient {
       },
     };
 
+    if (typeof window !== 'undefined') {
+      const token = window.localStorage.getItem('aemora_access_token');
+      if (token) {
+        const headers = new Headers(config.headers);
+        if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+        config.headers = headers;
+      }
+    }
+
     // Aplicar interceptores de petición
     for (const interceptor of this.requestInterceptors) {
       config = await interceptor(config, fullUrl);
@@ -182,6 +191,7 @@ export class HttpClient {
 
   public async delete<T>(endpoint: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
     const response = await this.executeFetch(endpoint, { ...options, method: 'DELETE' }, timeoutMs);
+    if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
 }

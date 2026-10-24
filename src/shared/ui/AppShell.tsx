@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
 import { QuickUserSwitcher } from '@/features/auth/components/QuickUserSwitcher';
 import { useAuthStore } from '@/shared/security/auth.store';
 import { ToastContainer } from './Toast';
+import { httpClient } from '@/shared/http/http-client';
 import {
   Home,
   Compass,
@@ -16,10 +17,12 @@ import {
   ShieldCheck,
   Search,
   PlusCircle,
-  Menu,
+  Sparkles,
+  TrendingUp,
+  Lock,
 } from 'lucide-react';
-
 import { AemoraLoginScreen } from '@/features/auth/components/AemoraLoginScreen';
+import { LoginAdventure3DNative as LoginAdventure3D } from '@/features/auth/components/LoginAdventure3DNative';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -28,13 +31,47 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuthStore();
+  const [hasHydrated, setHasHydrated] = useState(false);
+  const [showLegacyLogin, setShowLegacyLogin] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (userSearch.trim().length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      setIsSearchingUsers(true);
+      try {
+        const response = await httpClient.get<{ items: any[] }>(
+          `/api/v1/users/search?q=${encodeURIComponent(userSearch.trim())}`
+        );
+        setUserSearchResults(response.items ?? []);
+      } catch {
+        setUserSearchResults([]);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [userSearch]);
 
   // Si el usuario no ha iniciado sesión, desplegamos la pantalla de login inmersiva
-  if (!isAuthenticated) {
+  if (!hasHydrated || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="min-h-screen bg-[#0B0F17] text-[#F8FAFC]">
         <ToastContainer />
-        <AemoraLoginScreen />
+        {showLegacyLogin ? (
+          <AemoraLoginScreen />
+        ) : (
+          <LoginAdventure3D onCreateAccount={() => setShowLegacyLogin(true)} />
+        )}
       </div>
     );
   }
@@ -47,134 +84,270 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     { label: 'Perfil', href: '/profile', icon: UserIcon },
   ];
 
+  const trendingTopics = [
+    { tag: 'cybersecurity', posts: '14.2K posts', category: 'Ciberseguridad · Tendencia' },
+    { tag: 'owasp_top10', posts: '9.8K posts', category: 'Seguridad Web · Tendencia' },
+    { tag: 'clean_architecture', posts: '7.1K posts', category: 'Software · Tendencia' },
+    { tag: 'uiux_design', posts: '5.4K posts', category: 'Diseño · Tendencia' },
+  ];
+
+  const isMessagesPage = pathname === '/messages';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen bg-[#0B0F17] text-[#F8FAFC] flex justify-center antialiased selection:bg-[#1d9bf0]/30 selection:text-[#1d9bf0]">
       {/* Toast Global Notifications */}
       <ToastContainer />
 
-      {/* =========================================================================
-          SIDEBAR DE ESCRITORIO
-      ========================================================================= */}
-      <aside className="hidden md:flex flex-col justify-between w-64 lg:w-72 border-r border-slate-800/80 p-5 sticky top-0 h-screen shrink-0 bg-slate-950/70 backdrop-blur-2xl z-40">
-        <div className="flex flex-col gap-7">
-          {/* Cabecera con Logotipo de Alta Gama */}
-          <Link href="/" className="px-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl">
-            <Logo size="md" />
-          </Link>
+      {/* Contenedor Grid Principal de 3 Columnas (X / Cyber-Dark Layout) */}
+      <div className="w-full max-w-[1240px] flex justify-between min-h-screen">
+        {/* =========================================================================
+            COLUMNA 1: NAVEGACIÓN LATERAL IZQUIERDA (~68px - 240px)
+        ========================================================================= */}
+        <aside className="w-[68px] xl:w-[250px] flex flex-col justify-between p-2 sm:px-3 sm:py-3 sticky top-0 h-screen shrink-0 border-r border-white/[0.08] z-30">
+          <div className="flex flex-col gap-2">
+            {/* Logotipo de Aemora */}
+            <div className="p-2 xl:px-3 mb-1">
+              <Link
+                href="/"
+                className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/[0.08] transition-colors -ml-1"
+                aria-label="Aemora Home"
+              >
+                <Logo size="sm" showWordmark={false} />
+              </Link>
+            </div>
 
-          {/* Menú de Navegación con Detección de Ruta Activa */}
-          <nav className="flex flex-col gap-1.5" aria-label="Navegación principal">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
+            {/* Menú de Navegación con Botones Píldora (rounded-full) */}
+            <nav className="flex flex-col gap-1" aria-label="Navegación principal">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
 
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center justify-between px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 group ${
-                    isActive
-                      ? 'bg-gradient-to-r from-indigo-600/20 to-purple-600/10 text-indigo-300 border border-indigo-500/30 shadow-md shadow-indigo-950/30'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <Icon
-                      className={`w-5 h-5 transition-transform duration-200 group-hover:scale-110 ${
-                        isActive ? 'text-cyan-400' : 'text-slate-400'
-                      }`}
-                    />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                      {item.badge}
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className={`flex items-center gap-4 p-3 xl:px-4 xl:py-3 rounded-full transition-colors group ${
+                      isActive
+                        ? 'font-bold text-[#F8FAFC]'
+                        : 'text-[#F8FAFC] hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    <div className="relative flex items-center justify-center">
+                      <Icon
+                        className={`w-6 h-6 transition-transform group-hover:scale-105 ${
+                          isActive ? 'text-[#1d9bf0]' : 'text-[#F8FAFC]'
+                        }`}
+                      />
+                      {item.badge && !isActive && (
+                        <span className="w-2 h-2 rounded-full bg-[#1d9bf0] absolute -top-0.5 -right-0.5" />
+                      )}
+                    </div>
+                    <span className="hidden xl:inline text-lg leading-tight tracking-normal">
+                      {item.label}
                     </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+                  </Link>
+                );
+              })}
+            </nav>
 
-          {/* Botón Acción Crear Publicación */}
-          <Link
-            href="/"
-            className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <PlusCircle className="w-5 h-5" />
-            <span>Publicar</span>
-          </Link>
-        </div>
+            {/* Botón Acción Postear (Píldora rounded-full estilo X) */}
+            <div className="mt-4">
+              <Link
+                href="/"
+                className="hidden xl:flex items-center justify-center w-full py-3.5 px-4 rounded-full bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white font-bold text-[17px] shadow-sm transition-all hover:shadow-lg active:scale-95"
+              >
+                <span>Postear</span>
+              </Link>
 
-        {/* Tarjeta Inferior de Usuario Activo con Switcher */}
-        <div className="flex flex-col gap-3 pt-4 border-t border-slate-800/80">
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-slate-900/80 border border-slate-800">
-            <Link href="/profile" className="flex items-center gap-2.5 overflow-hidden flex-1 group">
-              <img
-                src={user.avatarUrl}
-                alt={user.displayName}
-                className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 object-cover shrink-0 group-hover:scale-105 transition-transform"
-              />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-slate-200 truncate group-hover:text-indigo-400 transition-colors">
-                  {user.displayName}
-                </span>
-                <span className="text-[11px] text-slate-400 truncate">@{user.username}</span>
+              {/* Botón flotante para vista compacta (pantallas intermedias) */}
+              <Link
+                href="/"
+                className="xl:hidden w-12 h-12 flex items-center justify-center rounded-full bg-[#1d9bf0] hover:bg-[#1a8cd8] text-white shadow-sm transition-all"
+                title="Postear"
+              >
+                <PlusCircle className="w-6 h-6" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Tarjeta Inferior de Usuario Activo en Formato Píldora */}
+          <div className="pt-2 pb-2">
+            <div className="hidden xl:flex items-center justify-between p-2 rounded-full hover:bg-white/[0.08] transition-colors cursor-pointer group">
+              <Link href="/profile" className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                <img
+                  src={user.avatarUrl}
+                  alt={user.displayName}
+                  className="w-10 h-10 rounded-full bg-[#161F30] border border-white/10 object-cover shrink-0"
+                />
+                <div className="flex flex-col min-w-0 leading-tight">
+                  <span className="text-sm font-bold text-[#F8FAFC] truncate">
+                    {user.displayName}
+                  </span>
+                  <span className="text-xs text-[#94A3B8] truncate">@{user.username}</span>
+                </div>
+              </Link>
+              <div className="shrink-0 ml-1">
+                <QuickUserSwitcher />
               </div>
-            </Link>
-
-            <div title="Zero-Trust Autenticación Segura" className="text-cyan-400 shrink-0 ml-1">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* =========================================================================
-          CONTENIDO PRINCIPAL Y HEADER SUPERIOR
-      ========================================================================= */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header Superior con QuickUserSwitcher */}
-        <header className="sticky top-0 z-30 h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl px-4 md:px-8 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 md:hidden">
-            <Link href="/">
-              <Logo size="sm" showWordmark={false} />
-            </Link>
-          </div>
-
-          {/* Buscador Global Rápido */}
-          <div className="relative flex-1 max-w-md hidden sm:block">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar en Aemora (#owasp, @carlos)..."
-              className="w-full bg-slate-900/90 border border-slate-800 rounded-full pl-10 pr-4 py-2 text-xs md:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-            />
-          </div>
-
-          {/* Controles del Header: Estado MSW y Quick User Switcher */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>MSW Active</span>
             </div>
 
-            {/* Selector Rápido de Usuarios (Emily / Carlos / Sofia) */}
-            <QuickUserSwitcher />
+            {/* Vista compacta del usuario */}
+            <div className="xl:hidden flex justify-center">
+              <QuickUserSwitcher />
+            </div>
           </div>
-        </header>
+        </aside>
 
-        {/* Área Central de Vistas */}
-        <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 pb-24 md:pb-6">
+        {/* =========================================================================
+            COLUMNA 2: FEED DE PUBLICACIONES AL CENTRO (~600px o ~950px en mensajes)
+        ========================================================================= */}
+        <main
+          className={`w-full min-h-screen border-r border-white/[0.08] flex flex-col pb-20 md:pb-6 ${
+            isMessagesPage ? 'max-w-[950px]' : 'max-w-[600px]'
+          }`}
+        >
           {children}
         </main>
+
+        {/* =========================================================================
+            COLUMNA 3: PANEL LATERAL DERECHO (AEMORA AI Y TENDENCIAS ~290px-350px)
+        ========================================================================= */}
+        {!isMessagesPage && (
+          <aside className="hidden lg:flex flex-col w-[300px] xl:w-[350px] p-4 gap-4 sticky top-0 h-screen overflow-y-auto shrink-0">
+            {/* Buscador Estilo X en Formato Píldora (rounded-full) */}
+            <div className="relative sticky top-0 z-10 bg-[#0B0F17] pb-1">
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-[#161F30] border border-transparent focus-within:border-[#1d9bf0] focus-within:bg-[#0B0F17] transition-all">
+                <Search className="w-4 h-4 text-[#94A3B8]" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  placeholder="Buscar en Aemora"
+                  className="w-full bg-transparent text-sm text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none"
+                />
+              </div>
+              {userSearch.trim().length >= 2 && (
+                <div className="absolute top-14 left-0 right-0 z-40 rounded-2xl bg-[#161F30] border border-white/[0.08] shadow-2xl overflow-hidden">
+                  {isSearchingUsers ? (
+                    <p className="p-3 text-xs text-[#94A3B8]">Buscando usuarios...</p>
+                  ) : userSearchResults.length === 0 ? (
+                    <p className="p-3 text-xs text-[#94A3B8]">No encontramos esa cuenta.</p>
+                  ) : (
+                    userSearchResults.map((person) => (
+                      <Link
+                        key={person.id}
+                        href={`/profile?username=${encodeURIComponent(person.username)}`}
+                        onClick={() => setUserSearch('')}
+                        className="flex items-center gap-3 p-3 hover:bg-white/[0.06]"
+                      >
+                        <img
+                          src={person.avatar_url ?? 'https://api.dicebear.com/7.x/avataaars/svg?seed=aemora'}
+                          alt={person.display_name}
+                          className="w-9 h-9 rounded-full object-cover"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold truncate">{person.display_name}</span>
+                          <span className="block text-xs text-[#94A3B8] truncate">@{person.username}</span>
+                        </span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Tarjeta Aemora AI (Degradado Accent AI + Llama 3.3 en Groq) */}
+            <div className="p-4 rounded-2xl bg-[#161F30] border border-white/[0.08] flex flex-col gap-3 shadow-md relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-pink-400" />
+                  <span
+                    className="font-bold text-base bg-clip-text text-transparent"
+                    style={{
+                      backgroundImage: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)',
+                    }}
+                  >
+                    Aemora AI
+                  </span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1d9bf0]/10 text-[#1d9bf0] font-semibold border border-[#1d9bf0]/20">
+                  Llama 3.3 70B
+                </span>
+              </div>
+
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                Asistente de inteligencia artificial para auditar ciberseguridad, Clean Architecture y optimizar tus publicaciones en tiempo real.
+              </p>
+
+              <Link
+                href="/messages"
+                className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-full text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)',
+                }}
+              >
+                <span>Conversar con Aemora AI</span>
+              </Link>
+            </div>
+
+            {/* Tarjeta de Tendencias (Estilo "Qué está pasando" en X) */}
+            <div className="rounded-2xl bg-[#161F30] border border-white/[0.08] overflow-hidden flex flex-col">
+              <div className="p-3.5 border-b border-white/[0.08] flex items-center justify-between">
+                <h3 className="font-black text-base text-[#F8FAFC] flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-[#1d9bf0]" />
+                  Qué está pasando
+                </h3>
+              </div>
+
+              <div className="flex flex-col">
+                {trendingTopics.map((topic) => (
+                  <Link
+                    key={topic.tag}
+                    href="/explore"
+                    className="p-3 hover:bg-white/[0.04] transition-colors flex flex-col gap-0.5"
+                  >
+                    <span className="text-xs text-[#94A3B8] font-normal">{topic.category}</span>
+                    <span className="text-sm font-bold text-[#F8FAFC]">#{topic.tag}</span>
+                    <span className="text-xs text-[#94A3B8] font-mono">{topic.posts}</span>
+                  </Link>
+                ))}
+              </div>
+
+              <Link
+                href="/explore"
+                className="p-3 text-xs text-[#1d9bf0] hover:bg-white/[0.04] font-medium transition-colors"
+              >
+                Mostrar más
+              </Link>
+            </div>
+
+            {/* Tarjeta de Seguridad OWASP Zero-Trust */}
+            <div className="p-4 rounded-2xl bg-[#161F30] border border-white/[0.08] flex flex-col gap-2 text-xs text-[#94A3B8]">
+              <div className="flex items-center gap-2 font-bold text-[#F8FAFC]">
+                <Lock className="w-3.5 h-3.5 text-[#1d9bf0]" />
+                <span>Seguridad Web Activa</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                OWASP Top 10 compliance: Sanitización estricta DOMPurify en tiempo de ejecución y JWT manejados exclusivamente en memoria volátil.
+              </p>
+            </div>
+
+            {/* Enlaces Legales / Footer estilo X */}
+            <footer className="px-2 text-[11px] text-[#94A3B8]/60 flex flex-wrap gap-x-2.5 gap-y-1">
+              <span className="hover:underline cursor-pointer">Condiciones de Servicio</span>
+              <span className="hover:underline cursor-pointer">Política de Privacidad</span>
+              <span className="hover:underline cursor-pointer">Accesibilidad</span>
+              <span>© 2026 Aemora Social</span>
+            </footer>
+          </aside>
+        )}
       </div>
 
       {/* =========================================================================
           BARRA DE NAVEGACIÓN MÓVIL INFERIOR
       ========================================================================= */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 flex justify-around py-2.5 px-2"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0F17]/95 backdrop-blur-xl border-t border-white/[0.08] flex justify-around py-2 px-2"
         aria-label="Navegación móvil"
       >
         {navItems.map((item) => {
@@ -185,14 +358,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex flex-col items-center gap-1 p-1.5 rounded-xl text-xs font-medium transition-colors relative ${
-                isActive ? 'text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`flex flex-col items-center gap-1 p-2 rounded-full text-xs font-medium transition-colors relative ${
+                isActive ? 'text-[#1d9bf0] font-bold' : 'text-[#94A3B8] hover:text-[#F8FAFC]'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px]">{item.label}</span>
+              <Icon className="w-6 h-6" />
               {item.badge && !isActive && (
-                <span className="w-2 h-2 rounded-full bg-pink-500 absolute top-1 right-2" />
+                <span className="w-2 h-2 rounded-full bg-[#1d9bf0] absolute top-1.5 right-2" />
               )}
             </Link>
           );

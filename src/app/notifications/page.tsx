@@ -36,7 +36,7 @@ export default function NotificationsPage() {
       actorAvatar: generateDiceBearAvatar('SofiaValdes_DesignLead'),
       actionText: 'le dio me gusta a tu publicación sobre Clean Architecture',
       snippet: '¡Bienvenidos oficialmente a la fase interactiva de Aemora! 🚀',
-      timeAgo: 'Hace 5 min',
+      timeAgo: '5m',
       isRead: false,
     },
     {
@@ -47,7 +47,7 @@ export default function NotificationsPage() {
       actorAvatar: generateDiceBearAvatar('CarlosMendez_SecurityLead'),
       actionText: 'comentó en tu post de seguridad:',
       snippet: '"Excelente despliegue. Todos los inputs sanitizados mediante DOMPurify..."',
-      timeAgo: 'Hace 25 min',
+      timeAgo: '25m',
       isRead: false,
     },
     {
@@ -58,7 +58,7 @@ export default function NotificationsPage() {
       actorAvatar: generateDiceBearAvatar('EmilyChen_Aemora_CEO'),
       actionText: 'te mencionó en una actualización:',
       snippet: '"Agradecimiento especial a todo el equipo por liderar las defensas OWASP..."',
-      timeAgo: 'Hace 1 hora',
+      timeAgo: '1h',
       isRead: true,
     },
     {
@@ -68,7 +68,7 @@ export default function NotificationsPage() {
       actorUsername: 'elena_cyber',
       actorAvatar: generateDiceBearAvatar('elena_cyber'),
       actionText: 'comenzó a seguirte en Aemora.',
-      timeAgo: 'Hace 3 horas',
+      timeAgo: '3h',
       isRead: true,
     },
   ]);
@@ -91,97 +91,92 @@ export default function NotificationsPage() {
   const getIcon = (type: NotificationItem['type']) => {
     switch (type) {
       case 'like':
-        return <Heart className="w-4 h-4 text-pink-500 fill-pink-500" />;
+        return <Heart className="w-5 h-5 text-pink-500 fill-pink-500" />;
       case 'comment':
-        return <MessageCircle className="w-4 h-4 text-indigo-400" />;
+        return <MessageCircle className="w-5 h-5 text-[#1d9bf0]" />;
       case 'mention':
-        return <AtSign className="w-4 h-4 text-cyan-400" />;
+        return <AtSign className="w-5 h-5 text-purple-400" />;
       case 'follow':
-        return <UserPlus className="w-4 h-4 text-emerald-400" />;
+        return <UserPlus className="w-5 h-5 text-emerald-400" />;
     }
   };
 
   return (
-    <div className="flex flex-col gap-5 max-w-3xl mx-auto">
-      {/* Cabecera y Acciones */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-2.5">
-          <Bell className="w-5 h-5 text-indigo-400" />
-          <h1 className="text-xl font-bold text-white">Notificaciones</h1>
-          <span className="text-xs bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded-full border border-indigo-500/30">
-            {notifications.filter((n) => !n.isRead).length} nuevas
+    <div className="flex flex-col w-full">
+      {/* Cabecera Fija Superior */}
+      <div className="sticky top-0 z-20 backdrop-blur-md bg-[#0B0F17]/80 border-b border-white/[0.08] px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-[#F8FAFC]">Notificaciones</h1>
+          <span className="text-[11px] bg-[#1d9bf0]/15 text-[#1d9bf0] font-bold px-2 py-0.5 rounded-full border border-[#1d9bf0]/30">
+            {notifications.filter((n) => !n.isRead).length}
           </span>
         </div>
 
         <button
           type="button"
           onClick={handleMarkAllAsRead}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 hover:text-white border border-slate-800 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-white/[0.08] text-xs font-semibold text-[#1d9bf0] transition-colors"
         >
-          <CheckCheck className="w-3.5 h-3.5 text-indigo-400" />
-          Marcar todas como leídas
+          <CheckCheck className="w-4 h-4" />
+          <span>Marcar leídas</span>
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-2">
+      {/* Pestañas de Filtro (rounded-full pills) */}
+      <div className="flex border-b border-white/[0.08] text-[15px]">
         {(['all', 'likes', 'comments'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setFilter(tab)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize transition-colors ${
-              filter === tab
-                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
+            className="flex-1 py-3 hover:bg-white/[0.03] transition-colors relative flex items-center justify-center font-bold text-xs sm:text-[15px]"
           >
-            {tab === 'all' ? 'Todas' : tab === 'likes' ? 'Reacciones' : 'Comentarios y Menciones'}
+            <span className={filter === tab ? 'text-[#F8FAFC]' : 'text-[#94A3B8]'}>
+              {tab === 'all' ? 'Todas' : tab === 'likes' ? 'Reacciones' : 'Menciones'}
+            </span>
+            {filter === tab && (
+              <div className="absolute bottom-0 h-1 w-12 rounded-full bg-[#1d9bf0]" />
+            )}
           </button>
         ))}
       </div>
 
-      {/* Lista de Notificaciones */}
-      <div className="flex flex-col gap-2.5">
+      {/* Lista de Notificaciones estilo Timeline (0px gap, border-b hairline) */}
+      <div className="flex flex-col">
         {filteredNotifications.length === 0 ? (
-          <div className="text-center py-16 text-slate-500 text-sm">
+          <div className="text-center py-20 text-[#94A3B8] text-[15px]">
             No tienes notificaciones en este filtro.
           </div>
         ) : (
           filteredNotifications.map((notif) => (
             <div
               key={notif.id}
-              className={`p-4 rounded-2xl border transition-all duration-200 flex items-start gap-3.5 group ${
-                notif.isRead
-                  ? 'bg-slate-900/40 border-slate-800/60 opacity-80'
-                  : 'bg-slate-900/90 border-indigo-500/30 shadow-md shadow-indigo-950/20'
+              className={`p-4 border-b border-white/[0.08] hover:bg-white/[0.02] transition-colors flex items-start gap-3.5 group relative ${
+                !notif.isRead ? 'bg-[#161F30]/30' : ''
               }`}
             >
-              <div className="relative shrink-0">
-                <img
-                  src={notif.actorAvatar}
-                  alt={notif.actorName}
-                  className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 object-cover"
-                />
-                <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-slate-950 border border-slate-800 shadow-sm">
-                  {getIcon(notif.type)}
-                </div>
-              </div>
+              <div className="shrink-0 pt-0.5">{getIcon(notif.type)}</div>
 
-              <div className="flex-1 min-w-0 text-xs md:text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-slate-300">
-                    <strong className="text-white hover:underline cursor-pointer">
+              <div className="flex-1 min-w-0 text-[15px]">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <img
+                    src={notif.actorAvatar}
+                    alt={notif.actorName}
+                    className="w-8 h-8 rounded-full bg-[#161F30] border border-white/10 object-cover"
+                  />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-[#F8FAFC] hover:underline cursor-pointer">
                       {notif.actorName}
-                    </strong>{' '}
-                    <span className="text-slate-400">@{notif.actorUsername}</span>{' '}
-                    {notif.actionText}
-                  </p>
-                  <span className="text-[11px] text-slate-500 shrink-0">{notif.timeAgo}</span>
+                    </span>
+                    <span className="text-[#94A3B8] text-xs">@{notif.actorUsername}</span>
+                    <span className="text-[#94A3B8] text-xs">· {notif.timeAgo}</span>
+                  </div>
                 </div>
+
+                <p className="text-[#94A3B8] text-sm leading-snug">{notif.actionText}</p>
 
                 {notif.snippet && (
-                  <p className="mt-1.5 p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400 italic">
+                  <p className="mt-2 p-3 rounded-2xl bg-[#161F30]/40 border border-white/[0.05] text-xs text-[#F8FAFC] italic">
                     {notif.snippet}
                   </p>
                 )}
@@ -190,10 +185,10 @@ export default function NotificationsPage() {
               <button
                 type="button"
                 onClick={() => handleDelete(notif.id)}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-all shrink-0"
+                className="opacity-0 group-hover:opacity-100 p-2 text-[#94A3B8] hover:text-red-400 rounded-full hover:bg-white/[0.05] transition-all shrink-0"
                 title="Eliminar notificación"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))

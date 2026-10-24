@@ -1,16 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAuthStore } from '@/shared/security/auth.store';
 import { useCreatePost } from '../hooks/useFeed';
 import {
   Image as ImageIcon,
   Sparkles,
-  Send,
   X,
   Hash,
   Globe,
-  Lock,
 } from 'lucide-react';
 
 const PRESET_IMAGES = [
@@ -40,8 +38,17 @@ export const CreatePostBox: React.FC = () => {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [imageQuery, setImageQuery] = useState('');
   const [tags, setTags] = useState<string[]>(['aemora']);
   const [isEnhancingWithAI, setIsEnhancingWithAI] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const maxChars = 1000;
+  const remainingChars = maxChars - content.length;
+  const filteredPresetImages = PRESET_IMAGES.filter((image) =>
+    image.label.toLowerCase().includes(imageQuery.trim().toLowerCase())
+  );
 
   const handleEnhanceWithAI = async () => {
     if (isEnhancingWithAI) return;
@@ -49,7 +56,7 @@ export const CreatePostBox: React.FC = () => {
     try {
       const promptToSend =
         content.trim() ||
-        'Escribe un anuncio breve y emocionante sobre las ventajas de una arquitectura Zero-Trust y Clean Architecture en una red social.';
+        'Escribe un post breve e impactante sobre Clean Architecture, Zero-Trust y seguridad frontend moderna.';
 
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -66,7 +73,7 @@ export const CreatePostBox: React.FC = () => {
       if (data.result) {
         setContent(data.result);
         const { toast } = await import('@/shared/ui/Toast');
-        toast('Post optimizado con Aemora AI ✨', 'Tu borrador fue mejorado utilizando Llama 3.3 en Groq.', 'success');
+        toast('Post optimizado con Aemora AI ✨', 'Texto refinado por Groq Llama 3.3.', 'success');
       }
     } catch (err: unknown) {
       const { toast } = await import('@/shared/ui/Toast');
@@ -80,9 +87,6 @@ export const CreatePostBox: React.FC = () => {
     }
   };
 
-  const maxChars = 1000;
-  const remainingChars = maxChars - content.length;
-
   const handleAddTag = (tag: string) => {
     if (!tags.includes(tag)) {
       setTags([...tags, tag]);
@@ -95,7 +99,7 @@ export const CreatePostBox: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || createPostMutation.isPending) return;
+    if ((!content.trim() && !selectedImageUrl) || createPostMutation.isPending) return;
 
     createPostMutation.mutate(
       {
@@ -117,41 +121,63 @@ export const CreatePostBox: React.FC = () => {
     );
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = window.localStorage.getItem('aemora_access_token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/posts/media`, {
+        method: 'POST',
+        body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'No se pudo subir la imagen.');
+      setSelectedImageUrl(data.url);
+      setShowImagePicker(false);
+    } catch (error) {
+      const { toast } = await import('@/shared/ui/Toast');
+      toast('Error al subir imagen', error instanceof Error ? error.message : 'Intenta de nuevo.', 'error');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   return (
-    <div className="rounded-2xl bg-slate-900/80 border border-slate-800/90 p-5 shadow-lg shadow-black/20 backdrop-blur-xl mb-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {/* Cabecera con Avatar Dinámico y Selector de Visibilidad */}
-        <div className="flex items-start gap-3.5">
+    <div className="p-4 border-b border-white/[0.08] bg-[#0B0F17] transition-colors">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        {/* Cabecera: Avatar 40px + Textarea sin borde (Estilo X) */}
+        <div className="flex items-start gap-3">
           <img
             src={user.avatarUrl}
             alt={user.displayName}
-            className="w-11 h-11 rounded-full bg-slate-800 border-2 border-indigo-500/40 object-cover shrink-0"
+            className="w-10 h-10 rounded-full bg-[#161F30] border border-white/10 object-cover shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
           />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-sm font-bold text-slate-100">{user.displayName}</span>
-              <span className="text-xs text-indigo-400 font-medium">@{user.username}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 flex items-center gap-1">
-                <Globe className="w-2.5 h-2.5" />
-                Público
-              </span>
+
+          <div className="flex-1 min-w-0 pt-1">
+            {/* Indicador de audiencia */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-white/[0.12] text-[#1d9bf0] text-xs font-semibold mb-2 hover:bg-[#1d9bf0]/10 cursor-pointer transition-colors">
+              <Globe className="w-3 h-3" />
+              <span>Cualquier persona puede responder</span>
             </div>
 
-            {/* Textarea del Post */}
+            {/* Textarea sin bordes */}
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder={`¿Qué idea, código o avance deseas compartir hoy, ${user.displayName.split(' ')[0]}?`}
+              placeholder="¡¿Qué está pasando?!"
               rows={3}
               maxLength={maxChars}
-              className="w-full bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-0 leading-relaxed"
+              className="w-full bg-transparent text-[15px] leading-[1.33] text-[#F8FAFC] placeholder-[#94A3B8] resize-none focus:outline-none focus:ring-0"
             />
           </div>
         </div>
 
-        {/* Vista Previa de Imagen Seleccionada */}
+        {/* Vista previa de imagen seleccionada con bordes 16px (rounded-2xl) */}
         {selectedImageUrl && (
-          <div className="relative rounded-xl overflow-hidden border border-slate-700/80 max-h-60 group">
+          <div className="relative ml-13 rounded-2xl overflow-hidden border border-white/[0.08] max-h-72 group">
             <img
               src={selectedImageUrl}
               alt="Adjunto seleccionado"
@@ -160,7 +186,7 @@ export const CreatePostBox: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedImageUrl(null)}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-950/80 text-white hover:bg-red-600 transition-colors"
+              className="absolute top-3 right-3 p-2 rounded-full bg-black/75 hover:bg-black text-white transition-all backdrop-blur-sm"
               aria-label="Quitar imagen"
             >
               <X className="w-4 h-4" />
@@ -168,24 +194,30 @@ export const CreatePostBox: React.FC = () => {
           </div>
         )}
 
-        {/* Selector Desplegable de Fotos de Unsplash */}
+        {/* Selector de fotos Unsplash */}
         {showImagePicker && (
-          <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-col gap-3 animate-in fade-in-50">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300">
-                Selecciona una foto segura (Unsplash):
-              </span>
+          <div className="ml-13 p-3.5 rounded-2xl bg-[#161F30] border border-white/[0.08] flex flex-col gap-3 animate-in fade-in-50">
+            <div className="flex items-center justify-between text-xs text-[#94A3B8]">
+              <span className="font-semibold text-[#F8FAFC]">Selecciona una foto segura:</span>
               <button
                 type="button"
                 onClick={() => setShowImagePicker(false)}
-                className="text-slate-500 hover:text-slate-300"
+                className="hover:text-white"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
+            <input
+              type="search"
+              value={imageQuery}
+              onChange={(event) => setImageQuery(event.target.value)}
+              placeholder="Buscar en la galería de imágenes..."
+              className="w-full bg-[#0B0F17] border border-white/[0.08] rounded-md px-3 py-2 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#1d9bf0]"
+            />
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {PRESET_IMAGES.map((img) => (
+              {filteredPresetImages.map((img) => (
                 <button
                   key={img.label}
                   type="button"
@@ -193,22 +225,28 @@ export const CreatePostBox: React.FC = () => {
                     setSelectedImageUrl(img.url);
                     setShowImagePicker(false);
                   }}
-                  className="flex flex-col items-center gap-1 rounded-lg border border-slate-800 overflow-hidden hover:border-indigo-500 transition-all group"
+                  className="flex flex-col items-center gap-1 rounded-xl border border-white/[0.08] overflow-hidden hover:border-[#1d9bf0] transition-all group"
                 >
-                  <img src={img.url} alt={img.label} className="w-full h-16 object-cover group-hover:scale-105 transition-transform" />
-                  <span className="text-[10px] text-slate-400 py-1 font-medium">{img.label}</span>
+                  <img
+                    src={img.url}
+                    alt={img.label}
+                    className="w-full h-16 object-cover group-hover:scale-105 transition-transform"
+                  />
+                  <span className="text-[10px] text-[#94A3B8] py-1 font-medium">{img.label}</span>
                 </button>
               ))}
             </div>
+            {filteredPresetImages.length === 0 && (
+              <p className="text-xs text-[#94A3B8]">No hay imágenes de la galería con ese término. Puedes subir una foto o pegar una URL HTTPS.</p>
+            )}
 
-            {/* O pegar enlace personalizado */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+            <div className="flex items-center gap-2 pt-2 border-t border-white/[0.08]">
               <input
                 type="url"
                 value={customImageUrl}
                 onChange={(e) => setCustomImageUrl(e.target.value)}
-                placeholder="O pega una URL directa de imagen (https://...)"
-                className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                placeholder="O pega una URL HTTPS directa..."
+                className="flex-1 bg-[#0B0F17] border border-white/[0.08] rounded-md px-3 py-1.5 text-xs text-[#F8FAFC] placeholder-[#94A3B8] focus:outline-none focus:border-[#1d9bf0]"
               />
               <button
                 type="button"
@@ -219,7 +257,7 @@ export const CreatePostBox: React.FC = () => {
                     setCustomImageUrl('');
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-medium transition-colors"
+                className="px-3.5 py-1.5 rounded-full bg-[#1d9bf0] hover:bg-[#1a8cd8] text-xs text-white font-bold transition-all"
               >
                 Adjuntar
               </button>
@@ -227,12 +265,12 @@ export const CreatePostBox: React.FC = () => {
           </div>
         )}
 
-        {/* Etiquetas / Hashtags seleccionadas */}
-        <div className="flex items-center flex-wrap gap-1.5">
+        {/* Píldoras de Tags activas */}
+        <div className="flex items-center flex-wrap gap-1.5 ml-13">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold"
+              className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-[#1d9bf0]/10 text-[#1d9bf0] border border-[#1d9bf0]/20 text-xs font-semibold"
             >
               #{tag}
               <button
@@ -246,14 +284,13 @@ export const CreatePostBox: React.FC = () => {
             </span>
           ))}
 
-          {/* Sugerencias de Tags rápidas */}
-          {['owasp', 'nextjs', 'uiux', 'security'].map((quickTag) => (
+          {['owasp', 'cleancode', 'uiux'].map((quickTag) => (
             !tags.includes(quickTag) && (
               <button
                 key={quickTag}
                 type="button"
                 onClick={() => handleAddTag(quickTag)}
-                className="text-[11px] text-slate-500 hover:text-slate-300 font-medium px-2 py-0.5 rounded-full border border-dashed border-slate-800 hover:border-slate-700 transition-colors"
+                className="text-xs text-[#94A3B8] hover:text-[#F8FAFC] px-2.5 py-0.5 rounded-full border border-dashed border-white/[0.12] hover:border-white/30 transition-colors"
               >
                 +{quickTag}
               </button>
@@ -261,52 +298,77 @@ export const CreatePostBox: React.FC = () => {
           ))}
         </div>
 
-        {/* Barra de Acciones Inferior */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
-          <div className="flex items-center gap-1 text-slate-400">
+        {/* Barra de herramientas inferior con botón píldora y Aemora AI */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/[0.08] ml-13">
+          {/* Iconos de acciones */}
+          <div className="flex items-center gap-1 text-[#1d9bf0]">
             <button
               type="button"
               onClick={() => setShowImagePicker(!showImagePicker)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-indigo-400 text-xs font-medium transition-colors"
-              title="Adjuntar Imagen"
+              className="p-2 rounded-full hover:bg-[#1d9bf0]/10 transition-colors"
+              title="Multimedia"
             >
-              <ImageIcon className="w-4 h-4 text-indigo-400" />
-              <span className="hidden sm:inline">Multimedia</span>
+              <ImageIcon className="w-5 h-5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleImageUpload(file);
+                event.currentTarget.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              className="px-2 text-xs text-[#94A3B8] hover:text-[#F8FAFC] disabled:opacity-50"
+              title="Subir imagen desde tu dispositivo"
+            >
+              {isUploadingImage ? 'Subiendo...' : 'Subir foto'}
             </button>
             <button
               type="button"
               onClick={() => handleAddTag('trend')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-pink-400 text-xs font-medium transition-colors"
-              title="Etiqueta"
+              className="p-2 rounded-full hover:bg-[#1d9bf0]/10 transition-colors"
+              title="Hashtag"
             >
-              <Hash className="w-4 h-4 text-pink-400" />
-              <span className="hidden sm:inline">Etiqueta</span>
+              <Hash className="w-5 h-5" />
             </button>
+
+            {/* Botón de la varita mágica ✨ de Aemora AI (Píldora con degradado AI) */}
             <button
               type="button"
               onClick={handleEnhanceWithAI}
               disabled={isEnhancingWithAI}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 text-xs font-semibold transition-all shadow-sm"
-              title="Mejorar y optimizar con Aemora AI (Groq Llama 3.3)"
+              className="ml-1 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white transition-all shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50"
+              style={{
+                background: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)',
+              }}
+              title="Mejorar y optimizar con Aemora AI (Llama 3.3 en Groq)"
             >
               {isEnhancingWithAI ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-cyan-300">Optimizando...</span>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Optimizando...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                  <Sparkles className="w-3.5 h-3.5" />
                   <span>Aemora AI ✨</span>
                 </>
               )}
             </button>
           </div>
 
+          {/* Contador y Botón de Publicar (Píldora redondeada X) */}
           <div className="flex items-center gap-3">
             <span
-              className={`text-xs font-mono font-medium ${
-                remainingChars < 100 ? 'text-amber-400' : 'text-slate-500'
+              className={`text-xs font-mono ${
+                remainingChars < 100 ? 'text-amber-400' : 'text-[#94A3B8]'
               }`}
             >
               {remainingChars}
@@ -314,20 +376,10 @@ export const CreatePostBox: React.FC = () => {
 
             <button
               type="submit"
-              disabled={!content.trim() || createPostMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              disabled={(!content.trim() && !selectedImageUrl) || createPostMutation.isPending}
+              className="px-5 py-2 rounded-full bg-[#1d9bf0] hover:bg-[#1a8cd8] disabled:opacity-50 disabled:hover:bg-[#1d9bf0] text-white text-[15px] font-bold shadow-sm transition-all"
             >
-              {createPostMutation.isPending ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Publicando...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Publicar</span>
-                </>
-              )}
+              {createPostMutation.isPending ? 'Posteando...' : 'Postear'}
             </button>
           </div>
         </div>

@@ -12,7 +12,9 @@ export type MediaType = z.infer<typeof MediaTypeSchema>;
 export const PostMediaSchema = z.object({
   id: z.string().min(1),
   type: MediaTypeSchema.default('image'),
-  url: z.string().url({ message: 'La URL del archivo multimedia debe ser válida.' }),
+  url: z.string().refine((value) => value.startsWith('/media/') || /^https?:\/\//.test(value), {
+    message: 'La URL del archivo multimedia debe ser válida.',
+  }),
   altText: z
     .string()
     .max(200, 'El texto alternativo no puede superar 200 caracteres.')
@@ -35,7 +37,7 @@ export const PostSchema = z.object({
   author: UserAuthorSchema,
   content: z
     .string()
-    .min(1, 'El post no puede estar vacío.')
+    .min(0)
     .max(1000, 'El post supera el límite de 1,000 caracteres.')
     .trim(),
   media: z.array(PostMediaSchema).max(4, 'Máximo 4 adjuntos por post.').default([]),
@@ -59,13 +61,13 @@ export type Post = z.infer<typeof PostSchema>;
 export const CreatePostInputSchema = z.object({
   content: z
     .string()
-    .min(1, 'El contenido es requerido.')
+    .min(0)
     .max(1000, 'Máximo 1000 caracteres permitidos.')
     .trim(),
   media: z
     .array(
       z.object({
-        url: z.string().url(),
+      url: z.string().refine((value) => value.startsWith('/media/') || /^https?:\/\//.test(value)),
         altText: z.string().max(200).optional(),
       })
     )
@@ -75,6 +77,8 @@ export const CreatePostInputSchema = z.object({
   visibility: PostVisibilitySchema.optional().default('public'),
   tags: z.array(z.string()).max(10).optional().default([]),
   author: UserAuthorSchema.optional(),
+}).refine((value) => value.content.trim().length > 0 || value.media.length > 0, {
+  message: 'El post debe incluir texto o una imagen.',
 });
 export type CreatePostInput = z.infer<typeof CreatePostInputSchema>;
 

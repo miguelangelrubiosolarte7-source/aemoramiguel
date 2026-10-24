@@ -3,14 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { initMocks } from '@/mocks/browser';
 
 export interface ProvidersProps {
   children: React.ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
-  const [mswReady, setMswReady] = useState(false);
+  const [mswReady, setMswReady] = useState(true);
 
   // Instancia única y aislada de QueryClient por ciclo de vida
   const [queryClient] = useState(
@@ -34,7 +33,7 @@ export function Providers({ children }: ProvidersProps) {
     // Inicializar Mock Service Worker en el cliente
     async function startServiceWorker() {
       try {
-        await initMocks();
+        // MSW desactivado: las peticiones deben llegar a FastAPI/PostgreSQL.
       } catch (error) {
         console.error('Error al inicializar Mock Service Worker:', error);
       } finally {

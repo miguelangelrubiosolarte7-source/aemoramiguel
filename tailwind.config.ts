@@ -12,8 +12,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
+        'x-blue': '#1d9bf0',
+        'x-blue-hover': '#1a8cd8',
+        'bg-root': '#0B0F17',
+        'surface-card': '#161F30',
+        'text-primary': '#F8FAFC',
+        'text-secondary': '#94A3B8',
+        hairline: 'rgba(255, 255, 255, 0.08)',
+      },
+      borderColor: {
+        hairline: 'rgba(255, 255, 255, 0.08)',
+      },
+      backgroundImage: {
+        'accent-ai': 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)',
+      },
+      fontSize: {
+        caption: ['11px', { lineHeight: '1.2' }],
+        body: ['15px', { lineHeight: '1.33' }],
+        subheading: ['20px', { lineHeight: '1.3' }],
+        heading: ['23px', { lineHeight: '1.2' }],
+      },
+      borderRadius: {
+        card: '16px',
+        input: '4px',
       },
     },
   },

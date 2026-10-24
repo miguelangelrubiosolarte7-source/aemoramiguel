@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User, generateDiceBearAvatar } from '@/core/domain/user.entity';
 
 /**
@@ -72,31 +73,124 @@ interface AuthState {
   allDemoUsers: User[];
   isAuthenticated: boolean;
   isLoading: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
   login: (user: User) => void;
+  loginWithCredentials: (usernameOrEmail: string, password: string) => Promise<User>;
+  loginWithFirebaseToken: (idToken: string) => Promise<User>;
+  registerWithCredentials: (input: { username: string; email: string; displayName: string; password: string }) => Promise<User>;
   logout: () => void;
   switchUser: (userId: string) => void;
   updateUser: (partialUser: Partial<User>) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: DEMO_USERS[0],
+const storedUser: User | null = typeof window !== 'undefined'
+  ? JSON.parse(localStorage.getItem('aemora_user') || 'null')
+  : null;
+const storedAccessToken = typeof window !== 'undefined' ? localStorage.getItem('aemora_access_token') : null;
+const storedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('aemora_refresh_token') : null;
+
+export const useAuthStore = create<AuthState>()(persist((set, get) => ({
+  user: storedUser || DEMO_USERS[0],
   allDemoUsers: DEMO_USERS,
   // Iniciamos en false para dar la bienvenida con la pantalla interactiva de Login
-  isAuthenticated: false,
+  isAuthenticated: Boolean(storedUser && storedAccessToken),
   isLoading: false,
+  accessToken: storedAccessToken,
+  refreshToken: storedRefreshToken,
 
   login: (user: User) => {
-    set({ user, isAuthenticated: true });
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('aemora_access_token')
+      : null;
+
+    // Los perfiles rápidos son solo demostrativos: no pueden abrir una sesión
+    // real ni publicar sin un JWT emitido por FastAPI.
+    if (!token) {
+      set({ user, isAuthenticated: false });
+      return;
+    }
+
+    if (typeof window !== 'undefined') localStorage.setItem('aemora_user', JSON.stringify(user));
+    set({ user, isAuthenticated: true, accessToken: token });
+  },
+
+  loginWithCredentials: async (usernameOrEmail, password) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ username_or_email: usernameOrEmail, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail?.[0]?.msg || data.detail || 'No se pudo iniciar sesión');
+    const apiUser = data.user;
+    const user: User = {
+      id: apiUser.id,
+      username: apiUser.username,
+      displayName: apiUser.display_name,
+      email: apiUser.email,
+      avatarUrl: apiUser.avatar_url || generateDiceBearAvatar(apiUser.username),
+      bannerUrl: '', bio: apiUser.bio || '', verified: apiUser.is_verified,
+      role: apiUser.role, stats: { followersCount: 0, followingCount: 0, postsCount: 0, likesReceivedCount: 0 },
+      isPrivate: false, createdAt: apiUser.created_at, updatedAt: apiUser.created_at,
+    };
+    localStorage.setItem('aemora_access_token', data.access_token);
+    localStorage.setItem('aemora_refresh_token', data.refresh_token);
+    localStorage.setItem('aemora_user', JSON.stringify(user));
+    set({ user, isAuthenticated: true, accessToken: data.access_token, refreshToken: data.refresh_token });
+    return user;
+  },
+
+  loginWithFirebaseToken: async (idToken) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/auth/firebase`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ id_token: idToken }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail?.[0]?.msg || data.detail || 'No se pudo iniciar sesión con Firebase');
+    const apiUser = data.user;
+    const user: User = {
+      id: apiUser.id,
+      username: apiUser.username,
+      displayName: apiUser.display_name,
+      email: apiUser.email,
+      avatarUrl: apiUser.avatar_url || generateDiceBearAvatar(apiUser.username),
+      bannerUrl: '', bio: apiUser.bio || '', verified: apiUser.is_verified,
+      role: apiUser.role, stats: { followersCount: 0, followingCount: 0, postsCount: 0, likesReceivedCount: 0 },
+      isPrivate: false, createdAt: apiUser.created_at, updatedAt: apiUser.created_at,
+    };
+    localStorage.setItem('aemora_access_token', data.access_token);
+    localStorage.setItem('aemora_refresh_token', data.refresh_token);
+    localStorage.setItem('aemora_user', JSON.stringify(user));
+    set({ user, isAuthenticated: true, accessToken: data.access_token, refreshToken: data.refresh_token });
+    return user;
+  },
+
+  registerWithCredentials: async ({ username, email, displayName, password }) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ username, email, display_name: displayName, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail?.[0]?.msg || data.detail || 'No se pudo registrar');
+    return get().loginWithCredentials(email, password);
   },
 
   logout: () => {
-    set({ isAuthenticated: false });
+    localStorage.removeItem('aemora_access_token');
+    localStorage.removeItem('aemora_refresh_token');
+    localStorage.removeItem('aemora_user');
+    set({ isAuthenticated: false, accessToken: null, refreshToken: null });
   },
 
   switchUser: (userId: string) => {
     const selected = DEMO_USERS.find((u) => u.id === userId);
-    if (selected) {
-      set({ user: selected, isAuthenticated: true });
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('aemora_access_token')
+      : null;
+    if (selected && token) {
+      set({ user: selected, isAuthenticated: true, accessToken: token });
     }
   },
 
@@ -105,4 +199,4 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: { ...state.user, ...partialUser, updatedAt: new Date().toISOString() },
     }));
   },
-}));
+}), { name: 'aemora-auth' }));
